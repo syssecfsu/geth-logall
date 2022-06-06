@@ -161,6 +161,7 @@ const schema string = `
         index: Int!
         depth: Int!
         value: BigInt!
+        inputData: Bytes!
     }
 
     # BlockFilterCriteria encapsulates log filter criteria for a filter applied

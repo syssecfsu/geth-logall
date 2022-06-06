@@ -195,13 +195,16 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 		evm.StateDB.CreateAccount(addr)
 	}
 	evm.Context.Transfer(evm.StateDB, caller.Address(), addr, value)
-	evm.StateDB.AddInternalTransaction(&types.InternalTransaction{
-		Address:    caller.Address(),
-		To:         addr,
-		From:       caller.Address(),
-		StackDepth: evm.depth,
-		Value:      value,
-	})
+	if !isPrecompile && evm.depth > 0 {
+		evm.StateDB.AddInternalTransaction(&types.InternalTransaction{
+			Address:    caller.Address(),
+			To:         addr,
+			From:       caller.Address(),
+			StackDepth: evm.depth,
+			Value:      value,
+			Input:      input,
+		})
+	}
 
 	// Capture the tracer start/end events in debug mode
 	if evm.Config.Debug {

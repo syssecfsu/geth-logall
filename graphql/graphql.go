@@ -1071,6 +1071,10 @@ func (t *InternalTransaction) Value(ctx context.Context) hexutil.Big {
 	return hexutil.Big(*t.internal.Value)
 }
 
+func (t *InternalTransaction) InputData(ctx context.Context) hexutil.Bytes {
+	return t.internal.Input
+}
+
 // CallData encapsulates arguments to `call` or `estimateGas`.
 // All arguments are optional.
 type CallData struct {

@@ -14,6 +14,7 @@ func (obj *rlpInternalTransaction) EncodeRLP(_w io.Writer) error {
 	w.WriteBytes(obj.Address[:])
 	w.WriteBytes(obj.To[:])
 	w.WriteBytes(obj.From[:])
+	w.WriteBytes(obj.Input)
 	w.ListEnd(_tmp0)
 	return w.Flush()
 }
