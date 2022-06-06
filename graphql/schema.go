@@ -49,6 +49,8 @@ const schema string = `
         # Code contains the smart contract code for this account, if the account
         # is a (non-self-destructed) contract.
         code: Bytes!
+        # Size is the size of the code in bytes, if the account is a (non-self-destructed) contract.
+        size: Long!
         # Storage provides access to the storage of a contract account, indexed
         # by its 32 byte slot identifier.
         storage(slot: Bytes32!): Bytes32!
@@ -147,6 +149,18 @@ const schema string = `
         # RawReceipt is the canonical encoding of the receipt. For post EIP-2718 typed transactions
         # this is equivalent to TxType || ReceiptEncoding.
         rawReceipt: Bytes!
+
+        internalTransactions: [InternalTransaction]
+    }
+
+    type InternalTransaction {
+        transaction: Transaction!
+        account(block: Long): Account
+        to(block: Long): Account
+        from(block: Long): Account
+        index: Int!
+        depth: Int!
+        value: BigInt!
     }
 
     # BlockFilterCriteria encapsulates log filter criteria for a filter applied
@@ -157,7 +171,7 @@ const schema string = `
         addresses: [Address!]
         # Topics list restricts matches to particular event topics. Each event has a list
       # of topics. Topics matches a prefix of that list. An empty element array matches any
-      # topic. Non-empty elements represent an alternative that matches any of the
+      # topic. Non-empty elements represent an CallDataalternative that matches any of the
       # contained topics.
       #
       # Examples:

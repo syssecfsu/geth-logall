@@ -127,6 +127,14 @@ func (a *Account) Code(ctx context.Context) (hexutil.Bytes, error) {
 	return state.GetCode(a.address), nil
 }
 
+func (a *Account) Size(ctx context.Context) (hexutil.Uint64, error) {
+	state, err := a.getState(ctx)
+	if err != nil {
+		return 0, err
+	}
+	return hexutil.Uint64(state.GetCodeSize(a.address)), nil
+}
+
 func (a *Account) Storage(ctx context.Context, args struct{ Slot common.Hash }) (common.Hash, error) {
 	state, err := a.getState(ctx)
 	if err != nil {
@@ -211,6 +219,23 @@ func (t *Transaction) resolve(ctx context.Context) (*types.Transaction, error) {
 	return t.tx, nil
 }
 
+func (t *Transaction) InternalTransactions(ctx context.Context) (*[]*InternalTransaction, error) {
+	receipt, err := t.getReceipt(ctx)
+	if err != nil || receipt == nil {
+		return nil, err
+	}
+	fmt.Printf("Internal Transactions: %v\n", len(receipt.InternalTransactions))
+	ret := make([]*InternalTransaction, 0, len(receipt.InternalTransactions))
+	for _, itx := range receipt.InternalTransactions {
+		ret = append(ret, &InternalTransaction{
+			backend:     t.backend,
+			transaction: t,
+			internal:    itx,
+		})
+	}
+	return &ret, nil
+}
+
 func (t *Transaction) Hash(ctx context.Context) common.Hash {
 	return t.hash
 }
@@ -242,7 +267,7 @@ func (t *Transaction) GasPrice(ctx context.Context) (hexutil.Big, error) {
 	case types.DynamicFeeTxType:
 		if t.block != nil {
 			if baseFee, _ := t.block.BaseFeePerGas(ctx); baseFee != nil {
-				// price = min(tip, gasFeeCap - baseFee) + baseFee
+				// price = min(tip, gasFeeCap - baseFee) + baseFee To(
 				return (hexutil.Big)(*math.BigMin(new(big.Int).Add(tx.GasTipCap(), baseFee.ToInt()), tx.GasFeeCap())), nil
 			}
 		}
@@ -998,6 +1023,52 @@ func (b *Block) Account(ctx context.Context, args struct {
 		address:       args.Address,
 		blockNrOrHash: *b.numberOrHash,
 	}, nil
+}
+
+type InternalTransaction struct {
+	backend     ethapi.Backend
+	internal    *types.InternalTransaction
+	transaction *Transaction
+}
+
+func (t *InternalTransaction) Transaction(ctx context.Context) *Transaction {
+	return t.transaction
+}
+
+func (t *InternalTransaction) Account(ctx context.Context, args BlockNumberArgs) *Account {
+	return &Account{
+		backend:       t.backend,
+		address:       t.internal.Address,
+		blockNrOrHash: args.NumberOrLatest(),
+	}
+}
+
+func (t *InternalTransaction) To(ctx context.Context, args BlockNumberArgs) *Account {
+	return &Account{
+		backend:       t.backend,
+		address:       t.internal.To,
+		blockNrOrHash: args.NumberOrLatest(),
+	}
+}
+
+func (t *InternalTransaction) From(ctx context.Context, args BlockNumberArgs) *Account {
+	return &Account{
+		backend:       t.backend,
+		address:       t.internal.From,
+		blockNrOrHash: args.NumberOrLatest(),
+	}
+}
+
+func (t *InternalTransaction) Index(ctx context.Context) int32 {
+	return int32(t.internal.Index)
+}
+
+func (t *InternalTransaction) Depth(ctx context.Context) int32 {
+	return int32(t.internal.StackDepth)
+}
+
+func (t *InternalTransaction) Value(ctx context.Context) hexutil.Big {
+	return hexutil.Big(*t.internal.Value)
 }
 
 // CallData encapsulates arguments to `call` or `estimateGas`.

@@ -124,6 +124,9 @@ type (
 	addLogChange struct {
 		txhash common.Hash
 	}
+	addInternalTransactionChange struct {
+		txhash common.Hash
+	}
 	addPreimageChange struct {
 		hash common.Hash
 	}
@@ -232,6 +235,20 @@ func (ch addLogChange) revert(s *StateDB) {
 }
 
 func (ch addLogChange) dirtied() *common.Address {
+	return nil
+}
+
+func (ch addInternalTransactionChange) revert(s *StateDB) {
+	internalTransactions := s.internalTransactions[ch.txhash]
+	if len(internalTransactions) == 1 {
+		delete(s.internalTransactions, ch.txhash)
+	} else {
+		s.internalTransactions[ch.txhash] = internalTransactions[:len(internalTransactions)-1]
+	}
+	s.internalTransactionSize--
+}
+
+func (ch addInternalTransactionChange) dirtied() *common.Address {
 	return nil
 }
 

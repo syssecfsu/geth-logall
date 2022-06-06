@@ -71,3 +71,11 @@ require (
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce
 	gopkg.in/urfave/cli.v1 v1.20.0
 )
+
+replace github.com/ethereum/go-ethereum/state => /home/ben/Desktop/go-ethereum/state
+
+replace github.com/ethereum/go-ethereum/core => /home/ben/Desktop/go-ethereum/core
+
+replace github.com/ethereum/go-ethereum/core/state => ./core/state
+
+replace github.com/ethereum/go-ethereum => ./

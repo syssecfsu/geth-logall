@@ -51,12 +51,13 @@ const (
 // Receipt represents the results of a transaction.
 type Receipt struct {
 	// Consensus fields: These fields are defined by the Yellow Paper
-	Type              uint8  `json:"type,omitempty"`
-	PostState         []byte `json:"root"`
-	Status            uint64 `json:"status"`
-	CumulativeGasUsed uint64 `json:"cumulativeGasUsed" gencodec:"required"`
-	Bloom             Bloom  `json:"logsBloom"         gencodec:"required"`
-	Logs              []*Log `json:"logs"              gencodec:"required"`
+	Type                 uint8                  `json:"type,omitempty"`
+	PostState            []byte                 `json:"root"`
+	Status               uint64                 `json:"status"`
+	CumulativeGasUsed    uint64                 `json:"cumulativeGasUsed" gencodec:"required"`
+	Bloom                Bloom                  `json:"logsBloom"         gencodec:"required"`
+	Logs                 []*Log                 `json:"logs"              gencodec:"required"`
+	InternalTransactions []*InternalTransaction `json:"internalTransactions" gencodec:"required"`
 
 	// Implementation fields: These fields are added by geth when processing a transaction.
 	// They are stored in the chain database.
@@ -91,9 +92,10 @@ type receiptRLP struct {
 
 // storedReceiptRLP is the storage encoding of a receipt.
 type storedReceiptRLP struct {
-	PostStateOrStatus []byte
-	CumulativeGasUsed uint64
-	Logs              []*LogForStorage
+	PostStateOrStatus    []byte
+	CumulativeGasUsed    uint64
+	Logs                 []*LogForStorage
+	InternalTransactions []*InternalTransaction
 }
 
 // v4StoredReceiptRLP is the storage encoding of a receipt used in database version 4.
@@ -264,6 +266,7 @@ func (r *Receipt) Size() common.StorageSize {
 	for _, log := range r.Logs {
 		size += common.StorageSize(len(log.Topics)*common.HashLength + len(log.Data))
 	}
+	//TODO: Add Internal Transactions
 	return size
 }
 
@@ -285,6 +288,13 @@ func (r *ReceiptForStorage) EncodeRLP(_w io.Writer) error {
 		}
 	}
 	w.ListEnd(logList)
+	itxList := w.List()
+	for _, itx := range r.InternalTransactions {
+		if err := rlp.Encode(w, itx); err != nil {
+			return err
+		}
+	}
+	w.ListEnd(itxList)
 	w.ListEnd(outerList)
 	return w.Flush()
 }
@@ -321,6 +331,10 @@ func decodeStoredReceiptRLP(r *ReceiptForStorage, blob []byte) error {
 	r.Logs = make([]*Log, len(stored.Logs))
 	for i, log := range stored.Logs {
 		r.Logs[i] = (*Log)(log)
+	}
+	r.InternalTransactions = make([]*InternalTransaction, len(stored.InternalTransactions))
+	for i, itx := range stored.InternalTransactions {
+		r.InternalTransactions[i] = (*InternalTransaction)(itx)
 	}
 	r.Bloom = CreateBloom(Receipts{(*Receipt)(r)})
 
@@ -400,6 +414,7 @@ func (rs Receipts) DeriveFields(config *params.ChainConfig, hash common.Hash, nu
 	signer := MakeSigner(config, new(big.Int).SetUint64(number))
 
 	logIndex := uint(0)
+	itxIndex := uint(0)
 	if len(txs) != len(rs) {
 		return errors.New("transaction and receipt count mismatch")
 	}
@@ -433,6 +448,15 @@ func (rs Receipts) DeriveFields(config *params.ChainConfig, hash common.Hash, nu
 			rs[i].Logs[j].TxIndex = uint(i)
 			rs[i].Logs[j].Index = logIndex
 			logIndex++
+		}
+		//TODO: Add BlockNumber
+		for j := 0; j < len(rs[i].InternalTransactions); j++ {
+			rs[i].InternalTransactions[j].TxHash = rs[i].TxHash
+			rs[i].InternalTransactions[j].TxIndex = uint(i)
+			rs[i].InternalTransactions[j].Index = itxIndex
+			rs[i].InternalTransactions[j].BlockHash = hash
+
+			itxIndex++
 		}
 	}
 	return nil

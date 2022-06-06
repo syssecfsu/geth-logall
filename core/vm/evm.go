@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/holiman/uint256"
@@ -194,6 +195,13 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 		evm.StateDB.CreateAccount(addr)
 	}
 	evm.Context.Transfer(evm.StateDB, caller.Address(), addr, value)
+	evm.StateDB.AddInternalTransaction(&types.InternalTransaction{
+		Address:    caller.Address(),
+		To:         addr,
+		From:       caller.Address(),
+		StackDepth: evm.depth,
+		Value:      value,
+	})
 
 	// Capture the tracer start/end events in debug mode
 	if evm.Config.Debug {
