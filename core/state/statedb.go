@@ -62,11 +62,14 @@ func (n *proofList) Delete(key []byte) error {
 // * Contracts
 // * Accounts
 type StateDB struct {
-	db           Database
-	prefetcher   *triePrefetcher
-	originalRoot common.Hash // The pre-state root, before any changes were made
-	trie         Trie
-	hasher       crypto.KeccakState
+	db         Database
+	prefetcher *triePrefetcher
+	trie       Trie
+	hasher     crypto.KeccakState
+
+	// originalRoot is the pre-state root, before any changes were made.
+	// It will be updated when the Commit is called.
+	originalRoot common.Hash
 
 	snaps         *snapshot.Tree
 	snap          snapshot.Snapshot
@@ -680,18 +683,19 @@ func (db *StateDB) ForEachStorage(addr common.Address, cb func(key, value common
 func (s *StateDB) Copy() *StateDB {
 	// Copy all the basic fields, initialize the memory ones
 	state := &StateDB{
-		db:                   s.db,
-		trie:                 s.db.CopyTrie(s.trie),
-		stateObjects:         make(map[common.Address]*stateObject, len(s.journal.dirties)),
-		stateObjectsPending:  make(map[common.Address]struct{}, len(s.stateObjectsPending)),
-		stateObjectsDirty:    make(map[common.Address]struct{}, len(s.journal.dirties)),
-		refund:               s.refund,
-		logs:                 make(map[common.Hash][]*types.Log, len(s.logs)),
-		internalTransactions: make(map[common.Hash][]*types.InternalTransaction, len(s.internalTransactions)),
-		logSize:              s.logSize,
-		preimages:            make(map[common.Hash][]byte, len(s.preimages)),
-		journal:              newJournal(),
-		hasher:               crypto.NewKeccakState(),
+		db:                  s.db,
+		trie:                s.db.CopyTrie(s.trie),
+		originalRoot:        s.originalRoot,
+		stateObjects:        make(map[common.Address]*stateObject, len(s.journal.dirties)),
+		stateObjectsPending: make(map[common.Address]struct{}, len(s.stateObjectsPending)),
+		stateObjectsDirty:   make(map[common.Address]struct{}, len(s.journal.dirties)),
+		refund:              s.refund,
+		logs:                make(map[common.Hash][]*types.Log, len(s.logs)),
+    internalTransactions: make(map[common.Hash][]*types.InternalTransaction, len(s.internalTransactions)),
+		logSize:             s.logSize,
+		preimages:           make(map[common.Hash][]byte, len(s.preimages)),
+		journal:             newJournal(),
+		hasher:              crypto.NewKeccakState(),
 	}
 	// Copy the dirty states, logs, and preimages
 	for addr := range s.journal.dirties {
@@ -853,7 +857,7 @@ func (s *StateDB) Finalise(deleteEmptyObjects bool) {
 		addressesToPrefetch = append(addressesToPrefetch, common.CopyBytes(addr[:])) // Copy needed for closure
 	}
 	if s.prefetcher != nil && len(addressesToPrefetch) > 0 {
-		s.prefetcher.prefetch(s.originalRoot, addressesToPrefetch)
+		s.prefetcher.prefetch(common.Hash{}, s.originalRoot, addressesToPrefetch)
 	}
 	// Invalidate journal because reverting across transactions is not allowed.
 	s.clearJournalAndRefund()
@@ -894,7 +898,7 @@ func (s *StateDB) IntermediateRoot(deleteEmptyObjects bool) common.Hash {
 	// _untouched_. We can check with the prefetcher, if it can give us a trie
 	// which has the same root, but also has some content loaded into it.
 	if prefetcher != nil {
-		if trie := prefetcher.trie(s.originalRoot); trie != nil {
+		if trie := prefetcher.trie(common.Hash{}, s.originalRoot); trie != nil {
 			s.trie = trie
 		}
 	}
@@ -910,7 +914,7 @@ func (s *StateDB) IntermediateRoot(deleteEmptyObjects bool) common.Hash {
 		usedAddrs = append(usedAddrs, common.CopyBytes(addr[:])) // Copy needed for closure
 	}
 	if prefetcher != nil {
-		prefetcher.used(s.originalRoot, usedAddrs)
+		prefetcher.used(common.Hash{}, s.originalRoot, usedAddrs)
 	}
 	if len(s.stateObjectsPending) > 0 {
 		s.stateObjectsPending = make(map[common.Address]struct{})
@@ -1023,6 +1027,7 @@ func (s *StateDB) Commit(deleteEmptyObjects bool) (common.Hash, error) {
 		}
 		s.snap, s.snapDestructs, s.snapAccounts, s.snapStorage = nil, nil, nil, nil
 	}
+	s.originalRoot = root
 	return root, err
 }
 
