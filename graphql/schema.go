@@ -170,6 +170,7 @@ const schema string = `
         address: Address!
         slot: BigInt!
         value: BigInt!
+        index: Long!
     }
 
     # BlockFilterCriteria encapsulates log filter criteria for a filter applied

@@ -1110,6 +1110,10 @@ func (r *ReadStorage) Value(ctx context.Context) hexutil.Big {
 	return hexutil.Big(*r.internal.Value)
 }
 
+func (r *ReadStorage) Index(ctx context.Context) Long {
+	return Long(r.internal.Index)
+}
+
 // CallData encapsulates arguments to `call` or `estimateGas`.
 // All arguments are optional.
 type CallData struct {

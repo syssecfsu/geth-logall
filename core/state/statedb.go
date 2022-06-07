@@ -255,6 +255,12 @@ func (s *StateDB) InternalTransactions() []*types.InternalTransaction {
 }
 
 func (s *StateDB) AddReadStorage(rs *types.ReadStorage) {
+	for _, i := range s.readStorage[s.thash] {
+		if rs.Address == i.Address && rs.Slot.Cmp(i.Slot) == 0 {
+			return // already added
+		}
+	}
+
 	s.journal.append(addReadStorageChange{txhash: s.thash})
 
 	rs.TxHash = s.thash
@@ -774,6 +780,14 @@ func (s *StateDB) Copy() *StateDB {
 			*cpy[i] = *l
 		}
 		state.internalTransactions[hash] = cpy
+	}
+	for hash, rss := range s.readStorage {
+		cpy := make([]*types.ReadStorage, len(rss))
+		for i, l := range rss {
+			cpy[i] = new(types.ReadStorage)
+			*cpy[i] = *l
+		}
+		state.readStorage[hash] = cpy
 	}
 	for hash, preimage := range s.preimages {
 		state.preimages[hash] = preimage
