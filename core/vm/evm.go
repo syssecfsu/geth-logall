@@ -203,6 +203,7 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 			StackDepth: evm.depth,
 			Value:      value,
 			Input:      input,
+			Type:       0,
 		})
 	}
 
@@ -288,7 +289,18 @@ func (evm *EVM) CallCode(caller ContractRef, addr common.Address, input []byte, 
 	if p, isPrecompile := evm.precompile(addr); isPrecompile {
 		ret, gas, err = RunPrecompiledContract(p, input, gas)
 	} else {
+
 		addrCopy := addr
+		evm.StateDB.AddInternalTransaction(&types.InternalTransaction{
+			Address:    caller.Address(),
+			To:         addrCopy,
+			From:       caller.Address(),
+			StackDepth: evm.depth,
+			Value:      value,
+			Input:      input,
+			Type:       1,
+		})
+
 		// Initialise a new contract and set the code that is to be used by the EVM.
 		// The contract is a scoped environment for this execution context only.
 		contract := NewContract(caller, AccountRef(caller.Address()), value, gas)
@@ -329,7 +341,19 @@ func (evm *EVM) DelegateCall(caller ContractRef, addr common.Address, input []by
 	if p, isPrecompile := evm.precompile(addr); isPrecompile {
 		ret, gas, err = RunPrecompiledContract(p, input, gas)
 	} else {
+
 		addrCopy := addr
+
+		evm.StateDB.AddInternalTransaction(&types.InternalTransaction{
+			Address:    caller.Address(),
+			To:         addrCopy,
+			From:       caller.Address(),
+			StackDepth: evm.depth,
+			Value:      big0,
+			Input:      input,
+			Type:       2,
+		})
+
 		// Initialise a new contract and make initialise the delegate values
 		contract := NewContract(caller, AccountRef(caller.Address()), nil, gas).AsDelegate()
 		contract.SetCallCode(&addrCopy, evm.StateDB.GetCodeHash(addrCopy), evm.StateDB.GetCode(addrCopy))
@@ -382,6 +406,16 @@ func (evm *EVM) StaticCall(caller ContractRef, addr common.Address, input []byte
 		// leak the 'contract' to the outer scope, and make allocation for 'contract'
 		// even if the actual execution ends on RunPrecompiled above.
 		addrCopy := addr
+
+		evm.StateDB.AddInternalTransaction(&types.InternalTransaction{
+			Address:    caller.Address(),
+			To:         addrCopy,
+			From:       caller.Address(),
+			StackDepth: evm.depth,
+			Value:      big0,
+			Input:      input,
+			Type:       3,
+		})
 		// Initialise a new contract and set the code that is to be used by the EVM.
 		// The contract is a scoped environment for this execution context only.
 		contract := NewContract(caller, AccountRef(addrCopy), new(big.Int), gas)
@@ -445,6 +479,22 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 		evm.StateDB.SetNonce(address, 1)
 	}
 	evm.Context.Transfer(evm.StateDB, caller.Address(), address, value)
+
+	txType := 6
+	if typ == CREATE {
+		txType = 4
+	} else if typ == CREATE2 {
+		txType = 5
+	}
+	evm.StateDB.AddInternalTransaction(&types.InternalTransaction{
+		Address:    caller.Address(),
+		To:         address,
+		From:       caller.Address(),
+		StackDepth: evm.depth,
+		Value:      value,
+		Input:      nil,
+		Type:       txType,
+	})
 
 	// Initialise a new contract and set the code that is to be used by the EVM.
 	// The contract is a scoped environment for this execution context only.

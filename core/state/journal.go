@@ -127,6 +127,9 @@ type (
 	addInternalTransactionChange struct {
 		txhash common.Hash
 	}
+	addReadStorageChange struct {
+		txhash common.Hash
+	}
 	addPreimageChange struct {
 		hash common.Hash
 	}
@@ -249,6 +252,20 @@ func (ch addInternalTransactionChange) revert(s *StateDB) {
 }
 
 func (ch addInternalTransactionChange) dirtied() *common.Address {
+	return nil
+}
+
+func (ch addReadStorageChange) revert(s *StateDB) {
+	readStorages := s.readStorage[ch.txhash]
+	if len(readStorages) == 1 {
+		delete(s.readStorage, ch.txhash)
+	} else {
+		s.readStorage[ch.txhash] = readStorages[:len(readStorages)-1]
+	}
+	s.readStorageSize--
+}
+
+func (ch addReadStorageChange) dirtied() *common.Address {
 	return nil
 }
 

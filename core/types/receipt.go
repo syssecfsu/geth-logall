@@ -58,6 +58,7 @@ type Receipt struct {
 	Bloom                Bloom                  `json:"logsBloom"         gencodec:"required"`
 	Logs                 []*Log                 `json:"logs"              gencodec:"required"`
 	InternalTransactions []*InternalTransaction `json:"internalTransactions" gencodec:"required"`
+	ReadStorage          []*ReadStorage         `json:"readStorage" gencodec:"required"`
 
 	// Implementation fields: These fields are added by geth when processing a transaction.
 	// They are stored in the chain database.
@@ -96,6 +97,7 @@ type storedReceiptRLP struct {
 	CumulativeGasUsed    uint64
 	Logs                 []*LogForStorage
 	InternalTransactions []*InternalTransaction
+	ReadStorage          []*ReadStorage
 }
 
 // v4StoredReceiptRLP is the storage encoding of a receipt used in database version 4.
@@ -295,6 +297,13 @@ func (r *ReceiptForStorage) EncodeRLP(_w io.Writer) error {
 		}
 	}
 	w.ListEnd(itxList)
+	rsList := w.List()
+	for _, rs := range r.ReadStorage {
+		if err := rlp.Encode(w, rs); err != nil {
+			return err
+		}
+	}
+	w.ListEnd(rsList)
 	w.ListEnd(outerList)
 	return w.Flush()
 }
@@ -335,6 +344,10 @@ func decodeStoredReceiptRLP(r *ReceiptForStorage, blob []byte) error {
 	r.InternalTransactions = make([]*InternalTransaction, len(stored.InternalTransactions))
 	for i, itx := range stored.InternalTransactions {
 		r.InternalTransactions[i] = (*InternalTransaction)(itx)
+	}
+	r.ReadStorage = make([]*ReadStorage, len(stored.ReadStorage))
+	for i, rs := range stored.ReadStorage {
+		r.ReadStorage[i] = (*ReadStorage)(rs)
 	}
 	r.Bloom = CreateBloom(Receipts{(*Receipt)(r)})
 
@@ -415,6 +428,7 @@ func (rs Receipts) DeriveFields(config *params.ChainConfig, hash common.Hash, nu
 
 	logIndex := uint(0)
 	itxIndex := uint(0)
+	rsIndex := uint(0)
 	if len(txs) != len(rs) {
 		return errors.New("transaction and receipt count mismatch")
 	}
@@ -449,14 +463,25 @@ func (rs Receipts) DeriveFields(config *params.ChainConfig, hash common.Hash, nu
 			rs[i].Logs[j].Index = logIndex
 			logIndex++
 		}
-		//TODO: Add BlockNumber
+
 		for j := 0; j < len(rs[i].InternalTransactions); j++ {
 			rs[i].InternalTransactions[j].TxHash = rs[i].TxHash
 			rs[i].InternalTransactions[j].TxIndex = uint(i)
 			rs[i].InternalTransactions[j].Index = itxIndex
 			rs[i].InternalTransactions[j].BlockHash = hash
+			rs[i].InternalTransactions[j].BlockNumber = number
 
 			itxIndex++
+		}
+
+		for j := 0; j < len(rs[i].ReadStorage); j++ {
+			rs[i].ReadStorage[j].TxHash = rs[i].TxHash
+			rs[i].ReadStorage[j].TxIndex = uint(i)
+			rs[i].ReadStorage[j].Index = rsIndex
+			rs[i].ReadStorage[j].BlockHash = hash
+			rs[i].ReadStorage[j].BlockNumber = number
+
+			rsIndex++
 		}
 	}
 	return nil

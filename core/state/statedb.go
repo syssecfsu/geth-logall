@@ -100,6 +100,9 @@ type StateDB struct {
 	internalTransactions    map[common.Hash][]*types.InternalTransaction
 	internalTransactionSize uint
 
+	readStorage     map[common.Hash][]*types.ReadStorage
+	readStorageSize uint
+
 	preimages map[common.Hash][]byte
 
 	// Per-transaction access list
@@ -146,6 +149,7 @@ func New(root common.Hash, db Database, snaps *snapshot.Tree) (*StateDB, error) 
 		stateObjectsDirty:    make(map[common.Address]struct{}),
 		logs:                 make(map[common.Hash][]*types.Log),
 		internalTransactions: make(map[common.Hash][]*types.InternalTransaction),
+		readStorage:          make(map[common.Hash][]*types.ReadStorage),
 		preimages:            make(map[common.Hash][]byte),
 		journal:              newJournal(),
 		accessList:           newAccessList(),
@@ -248,6 +252,32 @@ func (s *StateDB) InternalTransactions() []*types.InternalTransaction {
 		itx = append(itx, tx...)
 	}
 	return itx
+}
+
+func (s *StateDB) AddReadStorage(rs *types.ReadStorage) {
+	s.journal.append(addReadStorageChange{txhash: s.thash})
+
+	rs.TxHash = s.thash
+	rs.TxIndex = uint(s.txIndex)
+	rs.Index = s.readStorageSize
+	s.readStorage[s.thash] = append(s.readStorage[s.thash], rs)
+	s.readStorageSize++
+}
+
+func (s *StateDB) GetReadStorage(hash common.Hash, blockHash common.Hash) []*types.ReadStorage {
+	rs := s.readStorage[hash]
+	for _, t := range rs {
+		t.BlockHash = blockHash
+	}
+	return rs
+}
+
+func (s *StateDB) ReadStorage() []*types.ReadStorage {
+	var rss []*types.ReadStorage
+	for _, rs := range s.readStorage {
+		rss = append(rss, rs...)
+	}
+	return rss
 }
 
 // AddPreimage records a SHA3 preimage seen by the VM.
@@ -683,19 +713,20 @@ func (db *StateDB) ForEachStorage(addr common.Address, cb func(key, value common
 func (s *StateDB) Copy() *StateDB {
 	// Copy all the basic fields, initialize the memory ones
 	state := &StateDB{
-		db:                  s.db,
-		trie:                s.db.CopyTrie(s.trie),
-		originalRoot:        s.originalRoot,
-		stateObjects:        make(map[common.Address]*stateObject, len(s.journal.dirties)),
-		stateObjectsPending: make(map[common.Address]struct{}, len(s.stateObjectsPending)),
-		stateObjectsDirty:   make(map[common.Address]struct{}, len(s.journal.dirties)),
-		refund:              s.refund,
-		logs:                make(map[common.Hash][]*types.Log, len(s.logs)),
-    internalTransactions: make(map[common.Hash][]*types.InternalTransaction, len(s.internalTransactions)),
-		logSize:             s.logSize,
-		preimages:           make(map[common.Hash][]byte, len(s.preimages)),
-		journal:             newJournal(),
-		hasher:              crypto.NewKeccakState(),
+		db:                   s.db,
+		trie:                 s.db.CopyTrie(s.trie),
+		originalRoot:         s.originalRoot,
+		stateObjects:         make(map[common.Address]*stateObject, len(s.journal.dirties)),
+		stateObjectsPending:  make(map[common.Address]struct{}, len(s.stateObjectsPending)),
+		stateObjectsDirty:    make(map[common.Address]struct{}, len(s.journal.dirties)),
+		refund:               s.refund,
+		logs:                 make(map[common.Hash][]*types.Log, len(s.logs)),
+		internalTransactions: make(map[common.Hash][]*types.InternalTransaction, len(s.internalTransactions)),
+		readStorage:          make(map[common.Hash][]*types.ReadStorage, len(s.readStorage)),
+		logSize:              s.logSize,
+		preimages:            make(map[common.Hash][]byte, len(s.preimages)),
+		journal:              newJournal(),
+		hasher:               crypto.NewKeccakState(),
 	}
 	// Copy the dirty states, logs, and preimages
 	for addr := range s.journal.dirties {

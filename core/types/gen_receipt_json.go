@@ -23,6 +23,7 @@ func (r Receipt) MarshalJSON() ([]byte, error) {
 		Bloom                Bloom                  `json:"logsBloom"         gencodec:"required"`
 		Logs                 []*Log                 `json:"logs"              gencodec:"required"`
 		InternalTransactions []*InternalTransaction `json:"internalTransactions" gencodec:"required"`
+		ReadStorage          []*ReadStorage         `json:"readStorage" gencodec:"required"`
 		TxHash               common.Hash            `json:"transactionHash" gencodec:"required"`
 		ContractAddress      common.Address         `json:"contractAddress"`
 		GasUsed              hexutil.Uint64         `json:"gasUsed" gencodec:"required"`
@@ -38,6 +39,7 @@ func (r Receipt) MarshalJSON() ([]byte, error) {
 	enc.Bloom = r.Bloom
 	enc.Logs = r.Logs
 	enc.InternalTransactions = r.InternalTransactions
+	enc.ReadStorage = r.ReadStorage
 	enc.TxHash = r.TxHash
 	enc.ContractAddress = r.ContractAddress
 	enc.GasUsed = hexutil.Uint64(r.GasUsed)
@@ -57,6 +59,7 @@ func (r *Receipt) UnmarshalJSON(input []byte) error {
 		Bloom                *Bloom                 `json:"logsBloom"         gencodec:"required"`
 		Logs                 []*Log                 `json:"logs"              gencodec:"required"`
 		InternalTransactions []*InternalTransaction `json:"internalTransactions" gencodec:"required"`
+		ReadStorage          []*ReadStorage         `json:"readStorage" gencodec:"required"`
 		TxHash               *common.Hash           `json:"transactionHash" gencodec:"required"`
 		ContractAddress      *common.Address        `json:"contractAddress"`
 		GasUsed              *hexutil.Uint64        `json:"gasUsed" gencodec:"required"`
@@ -93,6 +96,10 @@ func (r *Receipt) UnmarshalJSON(input []byte) error {
 		return errors.New("missing required field 'internalTransactions' for Receipt")
 	}
 	r.InternalTransactions = dec.InternalTransactions
+	if dec.ReadStorage == nil {
+		return errors.New("missing required field 'readStorage' for Receipt")
+	}
+	r.ReadStorage = dec.ReadStorage
 	if dec.TxHash == nil {
 		return errors.New("missing required field 'transactionHash' for Receipt")
 	}

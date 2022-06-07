@@ -224,13 +224,28 @@ func (t *Transaction) InternalTransactions(ctx context.Context) (*[]*InternalTra
 	if err != nil || receipt == nil {
 		return nil, err
 	}
-	fmt.Printf("Internal Transactions: %v\n", len(receipt.InternalTransactions))
+	//fmt.Printf("Internal Transactions: %v\n", len(receipt.InternalTransactions))
 	ret := make([]*InternalTransaction, 0, len(receipt.InternalTransactions))
 	for _, itx := range receipt.InternalTransactions {
 		ret = append(ret, &InternalTransaction{
 			backend:     t.backend,
 			transaction: t,
 			internal:    itx,
+		})
+	}
+	return &ret, nil
+}
+
+func (t *Transaction) ReadStorage(ctx context.Context) (*[]*ReadStorage, error) {
+	receipt, err := t.getReceipt(ctx)
+	if err != nil || receipt == nil {
+		return nil, err
+	}
+	//fmt.Printf("ReadStorage: %v\n", len(receipt.ReadStorage))
+	ret := make([]*ReadStorage, 0, len(receipt.ReadStorage))
+	for _, rs := range receipt.ReadStorage {
+		ret = append(ret, &ReadStorage{
+			internal: rs,
 		})
 	}
 	return &ret, nil
@@ -381,7 +396,7 @@ func (t *Transaction) To(ctx context.Context, args BlockNumberArgs) (*Account, e
 	return &Account{
 		backend:       t.backend,
 		address:       *to,
-		blockNrOrHash: args.NumberOrLatest(),
+		blockNrOrHash: args.NumberOr(*t.block.numberOrHash),
 	}, nil
 }
 
@@ -395,7 +410,7 @@ func (t *Transaction) From(ctx context.Context, args BlockNumberArgs) (*Account,
 	return &Account{
 		backend:       t.backend,
 		address:       from,
-		blockNrOrHash: args.NumberOrLatest(),
+		blockNrOrHash: args.NumberOr(*t.block.numberOrHash),
 	}, nil
 }
 
@@ -470,7 +485,7 @@ func (t *Transaction) CreatedContract(ctx context.Context, args BlockNumberArgs)
 	return &Account{
 		backend:       t.backend,
 		address:       receipt.ContractAddress,
-		blockNrOrHash: args.NumberOrLatest(),
+		blockNrOrHash: args.NumberOr(*t.block.numberOrHash),
 	}, nil
 }
 
@@ -880,7 +895,7 @@ func (b *Block) Miner(ctx context.Context, args BlockNumberArgs) (*Account, erro
 	return &Account{
 		backend:       b.backend,
 		address:       header.Coinbase,
-		blockNrOrHash: args.NumberOrLatest(),
+		blockNrOrHash: args.NumberOr(*b.numberOrHash),
 	}, nil
 }
 
@@ -1039,7 +1054,7 @@ func (t *InternalTransaction) Account(ctx context.Context, args BlockNumberArgs)
 	return &Account{
 		backend:       t.backend,
 		address:       t.internal.Address,
-		blockNrOrHash: args.NumberOrLatest(),
+		blockNrOrHash: args.NumberOr(*t.transaction.block.numberOrHash),
 	}
 }
 
@@ -1047,7 +1062,7 @@ func (t *InternalTransaction) To(ctx context.Context, args BlockNumberArgs) *Acc
 	return &Account{
 		backend:       t.backend,
 		address:       t.internal.To,
-		blockNrOrHash: args.NumberOrLatest(),
+		blockNrOrHash: args.NumberOr(*t.transaction.block.numberOrHash),
 	}
 }
 
@@ -1055,7 +1070,7 @@ func (t *InternalTransaction) From(ctx context.Context, args BlockNumberArgs) *A
 	return &Account{
 		backend:       t.backend,
 		address:       t.internal.From,
-		blockNrOrHash: args.NumberOrLatest(),
+		blockNrOrHash: args.NumberOr(*t.transaction.block.numberOrHash),
 	}
 }
 
@@ -1073,6 +1088,26 @@ func (t *InternalTransaction) Value(ctx context.Context) hexutil.Big {
 
 func (t *InternalTransaction) InputData(ctx context.Context) hexutil.Bytes {
 	return t.internal.Input
+}
+
+func (t *InternalTransaction) Type(ctx context.Context) int32 {
+	return int32(t.internal.Type)
+}
+
+type ReadStorage struct {
+	internal *types.ReadStorage
+}
+
+func (r *ReadStorage) Address(ctx context.Context) common.Address {
+	return r.internal.Address
+}
+
+func (r *ReadStorage) Slot(ctx context.Context) hexutil.Big {
+	return hexutil.Big(*r.internal.Slot)
+}
+
+func (r *ReadStorage) Value(ctx context.Context) hexutil.Big {
+	return hexutil.Big(*r.internal.Value)
 }
 
 // CallData encapsulates arguments to `call` or `estimateGas`.

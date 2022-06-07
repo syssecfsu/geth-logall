@@ -10,29 +10,37 @@ import (
 
 //TODO: Add BlockNumber
 type InternalTransaction struct {
-	TxHash     common.Hash    `json:"txHash"`
-	TxIndex    uint           `json:"txIndex"`
-	BlockHash  common.Hash    `json:"blockHash"`
-	Address    common.Address `json:"address"`
-	To         common.Address `json:"to"`
-	From       common.Address `json:"from"`
-	Index      uint           `json:"index"`
-	StackDepth int            `json:"stackDepth"`
-	Value      *big.Int       `json:"value"`
-	Input      []byte         `json:"input"`
+	TxHash      common.Hash    `json:"txHash"`
+	TxIndex     uint           `json:"txIndex"`
+	BlockHash   common.Hash    `json:"blockHash"`
+	BlockNumber uint64         `json:"blockNumber"`
+	Address     common.Address `json:"address"`
+	To          common.Address `json:"to"`
+	From        common.Address `json:"from"`
+	Index       uint           `json:"index"`
+	StackDepth  int            `json:"stackDepth"`
+	Value       *big.Int       `json:"value"`
+	Input       []byte         `json:"input"`
+	Type        int            `json:"type"`
 }
 
 //go:generate go run ../../rlp/rlpgen -type rlpInternalTransaction -out gen_internal_transaction_rlp.go
 
 type rlpInternalTransaction struct {
-	Address common.Address
-	To      common.Address
-	From    common.Address
-	Input   []byte
+	Address    common.Address
+	To         common.Address
+	From       common.Address
+	Value      *big.Int
+	Input      []byte
+	Type       uint64
+	StackDepth uint64
 }
 
 func (t *InternalTransaction) EncodeRLP(w io.Writer) error {
-	rl := rlpInternalTransaction{Address: t.Address, To: t.To, From: t.From, Input: t.Input}
+	rl := rlpInternalTransaction{
+		Address: t.Address, To: t.To,
+		From: t.From, Value: t.Value, Input: t.Input,
+		Type: uint64(t.Type), StackDepth: uint64(t.StackDepth)}
 	return rlp.Encode(w, &rl)
 }
 
@@ -40,7 +48,7 @@ func (t *InternalTransaction) DecodeRLP(s *rlp.Stream) error {
 	var dec rlpInternalTransaction
 	err := s.Decode(&dec)
 	if err == nil {
-		t.Address, t.To, t.From, t.Input = dec.Address, dec.To, dec.From, dec.Input
+		t.Address, t.To, t.From, t.Value, t.Input, t.Type, t.StackDepth = dec.Address, dec.To, dec.From, dec.Value, dec.Input, int(dec.Type), int(dec.StackDepth)
 	}
 	return err
 }
@@ -48,7 +56,10 @@ func (t *InternalTransaction) DecodeRLP(s *rlp.Stream) error {
 type InternalTransactionForStorage InternalTransaction
 
 func (t *InternalTransactionForStorage) EncodeRLP(w io.Writer) error {
-	rl := rlpInternalTransaction{Address: t.Address, To: t.To, From: t.From, Input: t.Input}
+	rl := rlpInternalTransaction{
+		Address: t.Address, To: t.To,
+		From: t.From, Value: t.Value, Input: t.Input,
+		Type: uint64(t.Type), StackDepth: uint64(t.StackDepth)}
 	return rlp.Encode(w, &rl)
 }
 
@@ -61,10 +72,13 @@ func (t *InternalTransactionForStorage) DecodeRLP(s *rlp.Stream) error {
 	err = rlp.DecodeBytes(blob, &dec)
 	if err == nil {
 		*t = InternalTransactionForStorage{
-			Address: dec.Address,
-			To:      dec.To,
-			From:    dec.From,
-			Input:   dec.Input,
+			Address:    dec.Address,
+			To:         dec.To,
+			From:       dec.From,
+			Value:      dec.Value,
+			Input:      dec.Input,
+			Type:       int(dec.Type),
+			StackDepth: int(dec.StackDepth),
 		}
 	}
 

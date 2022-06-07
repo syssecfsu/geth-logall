@@ -151,6 +151,7 @@ const schema string = `
         rawReceipt: Bytes!
 
         internalTransactions: [InternalTransaction]
+        readStorage: [ReadStorage]
     }
 
     type InternalTransaction {
@@ -162,6 +163,13 @@ const schema string = `
         depth: Int!
         value: BigInt!
         inputData: Bytes!
+        type: Int!
+    }
+
+    type ReadStorage {
+        address: Address!
+        slot: BigInt!
+        value: BigInt!
     }
 
     # BlockFilterCriteria encapsulates log filter criteria for a filter applied

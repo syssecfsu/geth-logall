@@ -517,7 +517,16 @@ func opSload(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]by
 	loc := scope.Stack.peek()
 	hash := common.Hash(loc.Bytes32())
 	val := interpreter.evm.StateDB.GetState(scope.Contract.Address(), hash)
+
+	slot := loc.Clone()
 	loc.SetBytes(val.Bytes())
+
+	interpreter.evm.StateDB.AddReadStorage(&types.ReadStorage{
+		Address: scope.Contract.Address(),
+		Slot:    slot.ToBig(),
+		Value:   loc.ToBig(),
+	})
+
 	return nil, nil
 }
 

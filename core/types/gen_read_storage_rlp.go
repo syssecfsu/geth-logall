@@ -8,12 +8,18 @@ package types
 import "github.com/ethereum/go-ethereum/rlp"
 import "io"
 
-func (obj *rlpInternalTransaction) EncodeRLP(_w io.Writer) error {
+func (obj *rlpReadStorage) EncodeRLP(_w io.Writer) error {
 	w := rlp.NewEncoderBuffer(_w)
 	_tmp0 := w.List()
 	w.WriteBytes(obj.Address[:])
-	w.WriteBytes(obj.To[:])
-	w.WriteBytes(obj.From[:])
+	if obj.Slot == nil {
+		w.Write(rlp.EmptyString)
+	} else {
+		if obj.Slot.Sign() == -1 {
+			return rlp.ErrNegativeBigInt
+		}
+		w.WriteBigInt(obj.Slot)
+	}
 	if obj.Value == nil {
 		w.Write(rlp.EmptyString)
 	} else {
@@ -22,9 +28,6 @@ func (obj *rlpInternalTransaction) EncodeRLP(_w io.Writer) error {
 		}
 		w.WriteBigInt(obj.Value)
 	}
-	w.WriteBytes(obj.Input)
-	w.WriteUint64(obj.Type)
-	w.WriteUint64(obj.StackDepth)
 	w.ListEnd(_tmp0)
 	return w.Flush()
 }
